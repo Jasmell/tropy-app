@@ -18,9 +18,19 @@ def scrape_data():
                 data = rows[1].find_all("td")
                 compra = float(data[1].get("data-order").replace("$", ""))
                 venta = float(data[2].get("data-order").replace("$", ""))
-                variacion = float(data[3].text.strip().replace("%", "").replace(" ", ""))
+
+                # 🔹 Fix for "ValueError: could not convert string to float"
+                raw_variacion = data[3].text.strip().replace("%", "").replace(" ", "")
+                clean_variacion = raw_variacion.lstrip("= ")  # Remove "=" if present
+
+                try:
+                    variacion = float(clean_variacion)
+                except ValueError:
+                    variacion = None  # Set to None or a default value like 0.00
+
                 spread = float(data[4].text.strip().replace("$", ""))
                 fecha = data[5].find("abbr").get("title")
+
                 return {
                     "compra": compra,
                     "venta": venta,
@@ -38,7 +48,3 @@ def scrape_data():
 @app.get("/scrape")
 def get_scraped_data():
     return scrape_data()
-
-# 🔹 Para correr el servidor:
-# uvicorn main:app --reload
-
