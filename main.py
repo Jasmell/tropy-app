@@ -5,57 +5,58 @@ from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
 
-    # 🔹 Configuración de CORS
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],  # Permitir todas las orígenes
-        allow_credentials=True,
-        allow_methods=["*"],  # Permitir todos los métodos
-        allow_headers=["*"],  # Permitir todos los encabezados
-    )
-    
-def scrape_data():
-    
+# 🔹 Configuración de CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Replace "*" with specific origins for production
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-    url = "https://www.infodolar.com.do"  # 🔹 URL de la web a scrapear
+def scrape_data():
+    url = "https://www.infodolar.com.do"
     headers = {"User-Agent": "Mozilla/5.0"}
 
-    response = requests.get(url, headers=headers)
-    if response.status_code == 200:
+    try:
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()  # Raise an error for bad HTTP responses
+    except requests.RequestException as e:
+        return {"error": f"Request failed: {str(e)}"}
+
+    try:
         soup = BeautifulSoup(response.text, "html.parser")
-        table = soup.find("table", {"class": "cotizaciones"})  # Reemplaza "cotizaciones" con la clase real de la tabla
-        if table:
-            rows = table.find_all("tr")
-            if len(rows) > 1:
-                data = rows[1].find_all("td")
-                compra = float(data[1].get("data-order").replace("$", ""))
-                venta = float(data[2].get("data-order").replace("$", ""))
-
-                # 🔹 Fix for "ValueError: could not convert string to float"
-                raw_variacion = data[3].text.strip().replace("%", "").replace(" ", "")
-                clean_variacion = raw_variacion.lstrip("= ")  # Remove "=" if present
-
-                try:
-                    variacion = float(clean_variacion)
-                except ValueError:
-                    variacion = None  # Set to None or a default value like 0.00
-
-                spread = float(data[4].text.strip().replace("$", ""))
-                fecha = data[5].find("abbr").get("title")
-
-                return {
-                    "compra": compra,
-                    "venta": venta,
-                    "variacion": variacion,
-                    "spread": spread,
-                    "fecha": fecha
-                }
-            else:
-                return {"error": "No se pudo encontrar la fila de datos"}
-        else:
+        table = soup.find("table", {"class": "cotizaciones"})
+        if not table:
             return {"error": "No se pudo encontrar la tabla"}
-    else:
-        return {"error": "No se pudo obtener la página"}
+
+        rows = table.find_all("tr")
+        if len(rows) <= 1:
+            return {"error": "No se pudo encontrar la fila de datos"}
+
+        data = rows[1].find_all("td")
+        compra = float(data[1].get("data-order", "0").replace("$", ""))
+        venta = float(data[2].get("data-order", "0").replace("$", ""))
+
+        raw_variacion = data[3].text.strip().replace("%", "").replace(" ", "")
+        clean_variacion = raw_variacion.lstrip("= ")
+        try:
+            variacion = float(clean_variacion)
+        except ValueError:
+            variacion = None
+
+        spread = float(data[4].text.strip().replace("$", ""))
+        fecha = data[5].find("abbr").get("title", "N/A")
+
+        return {
+            "compra": compra,
+            "venta": venta,
+            "variacion": variacion,
+            "spread": spread,
+            "fecha": fecha,
+        }
+    except Exception as e:
+        return {"error": f"Parsing failed: {str(e)}"}
 
 @app.get("/scrape")
 def get_scraped_data():
