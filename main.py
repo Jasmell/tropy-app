@@ -1,10 +1,22 @@
 from fastapi import FastAPI
 import requests
 from bs4 import BeautifulSoup
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
 
+    # 🔹 Configuración de CORS
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],  # Permitir todas las orígenes
+        allow_credentials=True,
+        allow_methods=["*"],  # Permitir todos los métodos
+        allow_headers=["*"],  # Permitir todos los encabezados
+    )
+    
 def scrape_data():
+    
+
     url = "https://www.infodolar.com.do"  # 🔹 URL de la web a scrapear
     headers = {"User-Agent": "Mozilla/5.0"}
 
